@@ -4,6 +4,7 @@ const addCurrentTabBtn = document.getElementById('add-current-tab-btn');
 const statusMessageEl = document.getElementById('status-message');
 
 const expandedFolderIds = new Set(['1']); // '1' = 북마크바, 기본으로 펼침
+const RESERVED_ROOT_FOLDER_IDS = new Set(['1', '2', '3']);
 let currentTree = [];
 
 function isFolder(node) {
@@ -21,9 +22,13 @@ function clearStatusMessage() {
 }
 
 async function loadTree() {
-  const [rootNode] = await chrome.bookmarks.getTree();
-  currentTree = rootNode.children ?? [];
-  renderTree();
+  try {
+    const [rootNode] = await chrome.bookmarks.getTree();
+    currentTree = rootNode.children ?? [];
+    renderTree();
+  } catch (error) {
+    showStatusMessage(`북마크를 불러오지 못했습니다: ${error.message}`);
+  }
 }
 
 function renderTree() {
@@ -82,25 +87,31 @@ function renderFolder(folderNode) {
   wrapper.className = 'folder';
   wrapper.dataset.id = folderNode.id;
 
+  const isReservedRoot = RESERVED_ROOT_FOLDER_IDS.has(folderNode.id);
+
   const header = document.createElement('div');
   header.className = 'folder-header';
-  header.draggable = true;
 
   const titleSpan = document.createElement('span');
   titleSpan.textContent = `${expandedFolderIds.has(folderNode.id) ? '▾' : '▸'} ${folderNode.title || '(제목 없음)'}`;
   titleSpan.addEventListener('click', () => toggleFolder(folderNode.id));
   header.appendChild(titleSpan);
 
-  const deleteBtn = document.createElement('button');
-  deleteBtn.className = 'delete-btn';
-  deleteBtn.textContent = '삭제';
-  deleteBtn.addEventListener('click', (event) => {
-    event.stopPropagation();
-    deleteNode(folderNode);
-  });
-  header.appendChild(deleteBtn);
+  if (!isReservedRoot) {
+    header.draggable = true;
 
-  attachDragHandlers(header, folderNode);
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.textContent = '삭제';
+    deleteBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      deleteNode(folderNode);
+    });
+    header.appendChild(deleteBtn);
+
+    attachDragHandlers(header, folderNode);
+  }
+
   wrapper.appendChild(header);
 
   if (!expandedFolderIds.has(folderNode.id)) {
@@ -126,7 +137,11 @@ function renderBookmarkRow(bookmarkNode) {
   titleEl.className = 'bookmark-title';
   titleEl.textContent = bookmarkNode.title || bookmarkNode.url;
   titleEl.title = bookmarkNode.url;
-  titleEl.addEventListener('click', () => chrome.tabs.create({ url: bookmarkNode.url }));
+  titleEl.addEventListener('click', () => {
+    chrome.tabs.create({ url: bookmarkNode.url }).catch((error) => {
+      showStatusMessage(`열기 실패: ${error.message}`);
+    });
+  });
   row.appendChild(titleEl);
 
   const deleteBtn = document.createElement('button');
@@ -215,10 +230,23 @@ async function moveNode(draggedId, targetNode) {
       await chrome.bookmarks.move(draggedId, { parentId: targetNode.id });
       return;
     }
+    const [draggedInfo] = await chrome.bookmarks.get(draggedId);
     const [targetInfo] = await chrome.bookmarks.get(targetNode.id);
+
+    let destinationIndex = targetInfo.index;
+    const isSameFolderForwardMove =
+      draggedInfo.parentId === targetInfo.parentId && draggedInfo.index < targetInfo.index;
+    if (isSameFolderForwardMove) {
+      // Chrome decrements the effective index for a same-parent forward move
+      // (the dragged item's removal shifts everything after it back by one).
+      // Compensate so the dragged item always lands immediately before the
+      // target, regardless of drag direction.
+      destinationIndex = targetInfo.index - 1;
+    }
+
     await chrome.bookmarks.move(draggedId, {
       parentId: targetInfo.parentId,
-      index: targetInfo.index,
+      index: destinationIndex,
     });
   } catch (error) {
     showStatusMessage(`이동 실패: ${error.message}`);

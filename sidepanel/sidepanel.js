@@ -84,8 +84,21 @@ function renderFolder(folderNode) {
 
   const header = document.createElement('div');
   header.className = 'folder-header';
-  header.textContent = `${expandedFolderIds.has(folderNode.id) ? '▾' : '▸'} ${folderNode.title || '(제목 없음)'}`;
-  header.addEventListener('click', () => toggleFolder(folderNode.id));
+
+  const titleSpan = document.createElement('span');
+  titleSpan.textContent = `${expandedFolderIds.has(folderNode.id) ? '▾' : '▸'} ${folderNode.title || '(제목 없음)'}`;
+  titleSpan.addEventListener('click', () => toggleFolder(folderNode.id));
+  header.appendChild(titleSpan);
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'delete-btn';
+  deleteBtn.textContent = '삭제';
+  deleteBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    deleteNode(folderNode);
+  });
+  header.appendChild(deleteBtn);
+
   wrapper.appendChild(header);
 
   if (!expandedFolderIds.has(folderNode.id)) {
@@ -113,6 +126,15 @@ function renderBookmarkRow(bookmarkNode) {
   titleEl.addEventListener('click', () => chrome.tabs.create({ url: bookmarkNode.url }));
   row.appendChild(titleEl);
 
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'delete-btn';
+  deleteBtn.textContent = '삭제';
+  deleteBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    deleteNode(bookmarkNode);
+  });
+  row.appendChild(deleteBtn);
+
   return row;
 }
 
@@ -126,4 +148,36 @@ function toggleFolder(folderId) {
 }
 
 searchInputEl.addEventListener('input', renderTree);
+
+async function deleteNode(node) {
+  try {
+    if (isFolder(node)) {
+      await chrome.bookmarks.removeTree(node.id);
+    } else {
+      await chrome.bookmarks.remove(node.id);
+    }
+  } catch (error) {
+    showStatusMessage(`삭제 실패: ${error.message}`);
+  }
+}
+
+async function addCurrentTabAsBookmark() {
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!activeTab?.url) {
+      showStatusMessage('현재 탭 정보를 가져올 수 없습니다.');
+      return;
+    }
+    await chrome.bookmarks.create({
+      parentId: '1',
+      title: activeTab.title || activeTab.url,
+      url: activeTab.url,
+    });
+  } catch (error) {
+    showStatusMessage(`추가 실패: ${error.message}`);
+  }
+}
+
+addCurrentTabBtn.addEventListener('click', addCurrentTabAsBookmark);
+
 loadTree();

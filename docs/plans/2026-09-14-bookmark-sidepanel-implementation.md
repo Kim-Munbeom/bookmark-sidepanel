@@ -736,7 +736,6 @@ function attachDragHandlers(el, node) {
   });
 
   el.addEventListener('dragover', (event) => {
-    if (!isFolder(node)) return;
     event.preventDefault();
     el.classList.add('drag-over');
   });
@@ -772,19 +771,30 @@ async function moveNode(draggedId, targetNode) {
 }
 ```
 
-- [ ] **Step 3: 수동 검증**
+- [ ] **Step 3: `sidepanel.css` 끝에 북마크 행의 드래그오버 표시 스타일 추가**
+
+`.folder-header.drag-over` 규칙은 Task 1에서 이미 추가됨. 북마크 행 위로 드래그했을 때도 동일하게 표시되도록 다음을 파일 끝에 추가한다.
+
+```css
+.bookmark-row.drag-over {
+  outline: 2px dashed rgba(66, 133, 244, 0.8);
+  outline-offset: -2px;
+}
+```
+
+- [ ] **Step 4: 수동 검증**
 
 1. 확장 프로그램 새로고침 후 사이드패널 열기
 2. 북마크 하나를 다른 폴더 위로 드래그해서 드롭 → 드롭 대상 폴더 헤더에 점선 테두리가 보이는지(드래그오버 표시), 드롭 후 `chrome://bookmarks`에서 실제로 이동했는지 확인
-3. 같은 폴더 안의 다른 북마크 위로 드래그해서 드롭 → 그 북마크 바로 앞으로 순서가 바뀌는지 확인
+3. 같은 폴더 안의 다른 북마크 위로 드래그해서 드롭 → 드래그하는 동안 대상 북마크 행에 점선 테두리가 보이는지, 드롭 후 그 북마크 바로 앞으로 순서가 바뀌는지 확인
 4. 폴더를 다른 폴더 위로 드래그 → 하위 폴더로 이동하는지 확인
 
-Expected: 세 가지 이동 시나리오 모두 `chrome://bookmarks`에 정확히 반영됨.
+Expected: 세 가지 이동 시나리오 모두 `chrome://bookmarks`에 정확히 반영되고, 드래그 중 대상 요소(폴더/북마크 모두)에 점선 테두리가 표시됨.
 
-- [ ] **Step 4: 커밋**
+- [ ] **Step 5: 커밋**
 
 ```bash
-git add sidepanel/sidepanel.js
+git add sidepanel/sidepanel.js sidepanel/sidepanel.css
 git commit -m "feat: 드래그앤드롭으로 북마크/폴더 이동 추가"
 ```
 

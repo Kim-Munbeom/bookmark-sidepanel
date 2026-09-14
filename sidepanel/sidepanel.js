@@ -29,6 +29,12 @@ async function loadTree() {
 function renderTree() {
   treeRootEl.innerHTML = '';
 
+  const query = searchInputEl.value.trim().toLowerCase();
+  if (query) {
+    renderSearchResults(query);
+    return;
+  }
+
   if (currentTree.length === 0) {
     showStatusMessage('북마크가 없습니다.');
     return;
@@ -37,6 +43,37 @@ function renderTree() {
   clearStatusMessage();
   for (const topFolder of currentTree) {
     treeRootEl.appendChild(renderFolder(topFolder));
+  }
+}
+
+function renderSearchResults(query) {
+  const matches = [];
+  collectMatchingBookmarks(currentTree, query, matches);
+
+  if (matches.length === 0) {
+    showStatusMessage('검색 결과가 없습니다.');
+    return;
+  }
+
+  clearStatusMessage();
+  const list = document.createElement('div');
+  list.className = 'search-results';
+  for (const bookmark of matches) {
+    list.appendChild(renderBookmarkRow(bookmark));
+  }
+  treeRootEl.appendChild(list);
+}
+
+function collectMatchingBookmarks(nodes, query, results) {
+  for (const node of nodes) {
+    if (isFolder(node)) {
+      collectMatchingBookmarks(node.children ?? [], query, results);
+      continue;
+    }
+    const haystack = `${node.title} ${node.url}`.toLowerCase();
+    if (haystack.includes(query)) {
+      results.push(node);
+    }
   }
 }
 
@@ -88,4 +125,5 @@ function toggleFolder(folderId) {
   renderTree();
 }
 
+searchInputEl.addEventListener('input', renderTree);
 loadTree();

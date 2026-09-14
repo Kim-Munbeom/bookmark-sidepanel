@@ -84,6 +84,7 @@ function renderFolder(folderNode) {
 
   const header = document.createElement('div');
   header.className = 'folder-header';
+  header.draggable = true;
 
   const titleSpan = document.createElement('span');
   titleSpan.textContent = `${expandedFolderIds.has(folderNode.id) ? '▾' : '▸'} ${folderNode.title || '(제목 없음)'}`;
@@ -99,6 +100,7 @@ function renderFolder(folderNode) {
   });
   header.appendChild(deleteBtn);
 
+  attachDragHandlers(header, folderNode);
   wrapper.appendChild(header);
 
   if (!expandedFolderIds.has(folderNode.id)) {
@@ -118,6 +120,7 @@ function renderBookmarkRow(bookmarkNode) {
   const row = document.createElement('div');
   row.className = 'bookmark-row';
   row.dataset.id = bookmarkNode.id;
+  row.draggable = true;
 
   const titleEl = document.createElement('span');
   titleEl.className = 'bookmark-title';
@@ -135,6 +138,7 @@ function renderBookmarkRow(bookmarkNode) {
   });
   row.appendChild(deleteBtn);
 
+  attachDragHandlers(row, bookmarkNode);
   return row;
 }
 
@@ -179,5 +183,46 @@ async function addCurrentTabAsBookmark() {
 }
 
 addCurrentTabBtn.addEventListener('click', addCurrentTabAsBookmark);
+
+function attachDragHandlers(el, node) {
+  el.addEventListener('dragstart', (event) => {
+    event.stopPropagation();
+    event.dataTransfer.setData('text/plain', node.id);
+  });
+
+  el.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    el.classList.add('drag-over');
+  });
+
+  el.addEventListener('dragleave', () => {
+    el.classList.remove('drag-over');
+  });
+
+  el.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    el.classList.remove('drag-over');
+    const draggedId = event.dataTransfer.getData('text/plain');
+    if (!draggedId || draggedId === node.id) return;
+    await moveNode(draggedId, node);
+  });
+}
+
+async function moveNode(draggedId, targetNode) {
+  try {
+    if (isFolder(targetNode)) {
+      await chrome.bookmarks.move(draggedId, { parentId: targetNode.id });
+      return;
+    }
+    const [targetInfo] = await chrome.bookmarks.get(targetNode.id);
+    await chrome.bookmarks.move(draggedId, {
+      parentId: targetInfo.parentId,
+      index: targetInfo.index,
+    });
+  } catch (error) {
+    showStatusMessage(`이동 실패: ${error.message}`);
+  }
+}
 
 loadTree();

@@ -225,4 +225,14 @@ async function moveNode(draggedId, targetNode) {
   }
 }
 
+function registerBookmarkChangeListeners() {
+  chrome.bookmarks.onCreated.addListener(loadTree);
+  chrome.bookmarks.onRemoved.addListener(loadTree);
+  chrome.bookmarks.onChanged.addListener(loadTree);
+  chrome.bookmarks.onMoved.addListener(loadTree);
+  chrome.bookmarks.onChildrenReordered.addListener(loadTree);
+}
+
+registerBookmarkChangeListeners();
+
 loadTree();

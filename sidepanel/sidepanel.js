@@ -73,6 +73,7 @@ function renderBookmarkRow(bookmarkNode) {
   titleEl.className = 'bookmark-title';
   titleEl.textContent = bookmarkNode.title || bookmarkNode.url;
   titleEl.title = bookmarkNode.url;
+  titleEl.addEventListener('click', () => chrome.tabs.create({ url: bookmarkNode.url }));
   row.appendChild(titleEl);
 
   return row;
